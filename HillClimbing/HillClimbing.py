@@ -55,7 +55,7 @@ def get_neighbors(state):
 
 # current => dict => room: [students] 
 def steepest_ascent_hill_climbing(students, rooms):
-    current = random_assignment(students, rooms)
+    current = None # Do i randomly pick a first assignment here?
 
     while True:
         neighbors = get_neighbors(current)
