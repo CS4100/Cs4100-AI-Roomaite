@@ -8,9 +8,9 @@ import math
 import copy
 import sys
 import os
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from shared.objective import Student, pair_cost, total_cost
+from shared.data import generate_students
 
 
 def make_initial_pairs(students):
@@ -25,8 +25,8 @@ def make_initial_pairs(students):
 
 def get_neighbor(pairs):
     """
-    take the current pairing and make a small change -
-    swap one person from one pair with someone from another pair
+    should take the current pairing and make a small change 
+    and hopefully swap one person from one pair with someone from another pair
     """
     new_pairs = copy.deepcopy(pairs)
     if len(new_pairs) < 2:
@@ -47,7 +47,7 @@ def get_neighbor(pairs):
 
 def simulated_annealing(students, initial_temp=100.0, cooling_rate=0.995, min_temp=0.01, max_iter=10000):
     """
-    main SA loop
+    what we gotta do
     - start with random pairs
     - generate neighbor by swapping
     - accept better solutions always, worse ones sometimes (based on temp)
@@ -61,7 +61,7 @@ def simulated_annealing(students, initial_temp=100.0, cooling_rate=0.995, min_te
 
     temp = initial_temp
 
-    # TODO: track cost history for plotting later
+    cost_history = [current_cost]
 
     for i in range(max_iter):
         if temp < min_temp:
@@ -87,5 +87,25 @@ def simulated_annealing(students, initial_temp=100.0, cooling_rate=0.995, min_te
             best_cost = current_cost
 
         temp *= cooling_rate
+        cost_history.append(current_cost)
 
-    return best, best_cost
+    return best, best_cost, cost_history
+
+# --- run it ---
+if __name__ == "__main__":
+    random.seed(42)
+
+    # generate test students (no LLM, just random)
+    students = generate_students(20)
+    print(f"running SA on {len(students)} students...\n")
+
+    best_pairs, best_cost, history = simulated_annealing(students)
+
+    print(f"starting cost: {history[0]}")
+    print(f"final cost:    {best_cost}")
+    print(f"iterations:    {len(history)}\n")
+
+    print("best pairings:")
+    for a, b in best_pairs:
+        c = pair_cost(a, b)
+        print(f"  {a.name:>12} <-> {b.name:<12}  cost: {c}")

@@ -35,6 +35,7 @@ def pair_cost(s1, s2):
     and add them up. if two students are identical on everything
     the cost is 0 (perfect roommates)
     
+    here is kinda what the formula i am going for.
     cost = |sleep1 - sleep2| + |clean1 - clean2| + |noise1 - noise2|
          + |roommate_count1 - roommate_count2| 
          + |num_features1 - num_features2|
