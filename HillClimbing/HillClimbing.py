@@ -51,11 +51,27 @@ def calculate_value(state):
     return score
 
 def get_neighbors(state):
-    return 
+    neighbors = []
+    rooms_list = list(state.keys())
+    
+    for i in range(len(rooms_list)):
+        for j in range(i + 1, len(rooms_list)):
+            room1 = rooms_list[i]
+            room2 = rooms_list[j]
+    
+            for student1 in state[room1]:
+                for student2 in state[room2]:
+                    new_state = {r: occupants[:] for r, occupants in state.items()}
+                    new_state[room1].remove(student1)
+                    new_state[room1].append(student2)
+                    new_state[room2].remove(student2)
+                    new_state[room2].append(student1)
+                    neighbors.append(new_state)
+    return neighbors
 
 # current => dict => room: [students] 
 def steepest_ascent_hill_climbing(students, rooms):
-    current = None # Do i randomly pick a first assignment here?
+    current = random_assignment
 
     while True:
         neighbors = get_neighbors(current)
