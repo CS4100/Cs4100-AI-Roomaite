@@ -1,6 +1,5 @@
 """
 simulated_annealing.py - SA for roommate matching
-CS4100 AI Project - Shray
 """
 
 import random
@@ -47,11 +46,10 @@ def get_neighbor(pairs):
 
 def simulated_annealing(students, initial_temp=100.0, cooling_rate=0.995, min_temp=0.01, max_iter=10000):
     """
-    what we gotta do
-    - start with random pairs
-    - generate neighbor by swapping
-    - accept better solutions always, worse ones sometimes (based on temp)
-    - cool down over time so we accept less bad moves as we go
+    so we need to start with random pairs
+    then generate neighbor by swapping
+    and accept better solutions always, worse ones sometimes 
+    and have it cool down over time so we accept less bad moves as we go
     """
     current = make_initial_pairs(students)
     current_cost = total_cost(current)
@@ -72,7 +70,7 @@ def simulated_annealing(students, initial_temp=100.0, cooling_rate=0.995, min_te
 
         delta = neighbor_cost - current_cost
 
-        # always accept if better, sometimes accept if worse
+        # always accept if its better but sometimes accept if worse
         if delta < 0:
             accept = True
         else:
@@ -91,11 +89,11 @@ def simulated_annealing(students, initial_temp=100.0, cooling_rate=0.995, min_te
 
     return best, best_cost, cost_history
 
-# --- run it ---
+#  run it and print results
 if __name__ == "__main__":
     random.seed(42)
 
-    # generate test students (no LLM, just random)
+    # generate test students
     students = generate_students(20)
     print(f"running SA on {len(students)} students...\n")
 

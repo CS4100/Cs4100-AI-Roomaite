@@ -1,9 +1,8 @@
 """
 objective.py - Shared cost function for roommate matching
-CS4100 AI Project
 
 everyone imports from here so we're all using the same 
-cost function and student data structure
+cost function and student data structure if needed we will reconvene if necessary
 """
 
 
@@ -29,13 +28,12 @@ class Student:
 
 def pair_cost(s1, s2):
     """
-    how compatible are two students? lower = better match
+    how compatible are two students by lower = better match
+    so we just take the difference of each preference
+    and then add them up. if two students are identical on everything
+    the cost is 0 which would be perfect roommates
     
-    we just take the absolute difference of each preference
-    and add them up. if two students are identical on everything
-    the cost is 0 (perfect roommates)
-    
-    here is kinda what the formula i am going for.
+    here is kinda what the formula i am going for and sort of the one we made
     cost = |sleep1 - sleep2| + |clean1 - clean2| + |noise1 - noise2|
          + |roommate_count1 - roommate_count2| 
          + |num_features1 - num_features2|
@@ -51,7 +49,7 @@ def pair_cost(s1, s2):
 
 def total_cost(pairs):
     """
-    given a list of (student, student) pairs, compute the 
+    given a list of student, student pairs, computing the 
     total cost across all pairs. this is what all our 
     algorithms are trying to minimize
     """

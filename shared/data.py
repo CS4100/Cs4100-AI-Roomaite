@@ -1,10 +1,9 @@
 """
-data.py - generate and load student data
-CS4100 AI Project
+data.py - generates and load student data
 
-generates random students for testing. no LLM involved,
+generates random students for testing.
 just random.randint with realistic ranges.
-also has csv save/load so the whole team uses the same dataset
+also has csv save/load so the team can use as data set if we need
 """
 
 import csv
@@ -65,7 +64,7 @@ def load_csv(filepath):
     return students
 
 
-# generate and save a default dataset if run directly
+# generate and save a default dataset if it runs directly
 if __name__ == "__main__":
     students = generate_students(20)
     save_csv(students, "data/students.csv")
