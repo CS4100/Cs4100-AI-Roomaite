@@ -91,7 +91,7 @@ def simulated_annealing(matrix, initial_temp=100.0, cooling_rate=0.995, min_temp
     return best, best_cost, cost_history, elapsed
 
 
-# --- run it ---
+#    run it 
 if __name__ == "__main__":
     random.seed(42)
 

@@ -12,7 +12,7 @@ import numpy as np
 def generate_students(n=10000, seed=42):
     """
     generate n students with random preferences
-    all values are random ints, no LLM involved
+    all values are random ints
     """
     np.random.seed(seed)
     
@@ -38,7 +38,7 @@ def generate_students(n=10000, seed=42):
 def generate_rooms(n=5000, seed=42):
     """
     generate n rooms with random features
-    binary columns: 0 = doesn't have it, 1 = has it
+    binary columns: 0 = doesn't have it  1 = has it
     """
     np.random.seed(seed + 1)  # different seed so rooms aren't identical to students
     
