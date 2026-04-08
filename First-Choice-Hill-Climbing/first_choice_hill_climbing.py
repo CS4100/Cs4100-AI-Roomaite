@@ -1,6 +1,9 @@
 import csv
 import random
+import time
 from pathlib import Path
+
+import matplotlib.pyplot as plt
 
 try:
     from tqdm import tqdm
@@ -128,6 +131,7 @@ def first_choice_hill_climbing(students, rooms, show_progress=True, max_iteratio
     n_r = len(r_ids)
     state = random_assignment_arrays(len(s_ids), cap, show_progress=show_progress)
     current_value = calculate_value_arrays(state, rpref, compat, feature_cost)
+    history = [current_value]
 
     for iteration in range(1, max_iterations + 1):
         if show_progress:
@@ -135,7 +139,6 @@ def first_choice_hill_climbing(students, rooms, show_progress=True, max_iteratio
 
         improved = False
 
-        # Shuffle room pairs so "first" is random, not always the same swap
         room_indices = list(range(n_r))
         random.shuffle(room_indices)
 
@@ -161,7 +164,6 @@ def first_choice_hill_climbing(students, rooms, show_progress=True, max_iteratio
                 actual1 = len(occ1) - 1
                 actual2 = len(occ2) - 1
 
-                # Shuffle students so "first" is random
                 candidates1 = list(occ1)
                 candidates2 = list(occ2)
                 random.shuffle(candidates1)
@@ -196,16 +198,16 @@ def first_choice_hill_climbing(students, rooms, show_progress=True, max_iteratio
 
                         delta = new - old
 
-                        # First choice: take the first improvement and move on
                         if delta < 0:
                             state[ri].remove(s1)
                             state[ri].append(s2)
                             state[rj].remove(s2)
                             state[rj].append(s1)
                             current_value += delta
+                            history.append(current_value)
                             improved = True
                             if show_progress:
-                                print(f"  → Accepted swap, new score={current_value}")
+                                print(f" → Accepted swap, new score={current_value}")
                             break
 
         if not improved:
@@ -220,7 +222,7 @@ def first_choice_hill_climbing(students, rooms, show_progress=True, max_iteratio
     assignment = {}
     for ri, occ in enumerate(state):
         assignment[r_ids[ri]] = [s_ids[si] for si in occ]
-    return assignment
+    return assignment, history
 
 def calculate_value(state, students, rooms):
     score = 0
@@ -240,9 +242,20 @@ def calculate_value(state, students, rooms):
         for sid in occupants:
             s = students[sid]
             wanted = {f[len("wants_"):] for f in s["room_features"] if f.startswith("wants_")}
-            has = {f[len("has_"):] for f in rooms[room]["features"] if f.startswith("has_")}
+            has    = {f[len("has_"):] for f in rooms[room]["features"] if f.startswith("has_")}
             score += len(wanted - has)
     return score
+
+def plot_history(history, n_students, n_rooms, elapsed, output_path):
+    plt.figure(figsize=(12, 5))
+    plt.plot(history)
+    plt.xlabel("iteration")
+    plt.ylabel("total cost")
+    plt.title(f"first choice hill climbing - {n_students} students, {n_rooms} rooms ({elapsed:.1f}s)")
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    plt.show()
+    print(f"Saved figure to {output_path}")
 
 def save_results(output_path, assignment, students, rooms):
     final_score = calculate_value(assignment, students, rooms)
@@ -254,15 +267,18 @@ def save_results(output_path, assignment, students, rooms):
             occupants = assignment[room_id]
             f.write(f"Room {room_id} ({room['name']}) - {len(occupants)}/{room['capacity']} occupants\n")
             for sid in occupants:
-                f.write(f"  - {sid}: {students[sid]['name']}\n")
+                f.write(f" - {sid}: {students[sid]['name']}\n")
             if not occupants:
-                f.write("  - <empty>\n")
+                f.write(" - <empty>\n")
             f.write("\n")
 
 def main():
     root = Path(__file__).resolve().parent.parent
     data_dir = root / "data"
-    output_path = root / "output.txt"
+    output_path = root / "results" / "output.txt"
+    results_dir = root / "results"
+    results_dir.mkdir(exist_ok=True)
+    results_path = results_dir / "first_choice_hill_climbing.png"
 
     print("Loading input CSV files...")
     students = load_students_csv(data_dir / "students.csv")
@@ -272,14 +288,17 @@ def main():
     if not TQDM_AVAILABLE:
         print("tqdm not installed — basic progress only. pip install tqdm")
 
-    assignment = first_choice_hill_climbing(
-        students, rooms, show_progress=True, max_iterations=1000
-    )
+    start = time.time()
+    assignment, history = first_choice_hill_climbing(
+        students, rooms, show_progress=True, max_iterations=1000)
+    elapsed = time.time() - start
+
     best_score = calculate_value(assignment, students, rooms)
     print(f"Final score: {best_score}")
     save_results(output_path, assignment, students, rooms)
     print(f"Saved results to {output_path}")
 
+    plot_history(history, len(students), len(rooms), elapsed, results_path)
 
 if __name__ == "__main__":
     main()
