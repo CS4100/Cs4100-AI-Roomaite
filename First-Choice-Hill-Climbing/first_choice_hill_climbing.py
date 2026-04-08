@@ -1,119 +1,129 @@
 import random
+import pandas as pd
 from itertools import combinations
 
-# Sample Data
-students = [
-    {"id": 1, "sleep": 2, "clean": 4, "noise": 1, "roommate_preference": 3, "room_features": ["quiet_floor", "AC"]},
-    {"id": 2, "sleep": 3, "clean": 4, "noise": 2, "roommate_preference": 1, "room_features": ["AC"]}
-]
+amenities = ["ac", "private_bath", "balcony", "kitchen", "laundry", "wifi", "parking"]
 
-rooms = [
-    {"room_id": "A101", "capacity": 2, "building": "example", "features": ["AC", "quiet_floor"]},
-    {"room_id": "A102", "capacity": 3, "building": "example", "features": ["AC"]}
-]
+# Load data in from CSVs
+def load_students(path="data/students.csv"):
+    df = pd.read_csv(path)
+    students = []
+    for _, row in df.iterrows():
+        students.append({
+            "id": int(row["student_id"]),
+            "name": row["name"],
+            "sleep": int(row["sleep"]),
+            "clean": int(row["clean"]),
+            "noise": int(row["noise"]),
+            "roommate_count": int(row["roommate_count"]),
+            **{f"wants_{a}": int(row[f"wants_{a}"]) for a in amenities}
+        })
+    return students
 
-student_map = {s["id"]: s for s in students}
-room_map    = {r["room_id"]: r for r in rooms}
+def load_rooms(path="data/rooms.csv"):
+    df = pd.read_csv(path)
+    rooms = []
+    for _, row in df.iterrows():
+        rooms.append({
+            "room_id": int(row["room_id"]),
+            "name": row["room_name"],
+            "capacity": int(row["capacity"]),
+            **{f"has_{a}": int(row[f"has_{a}"]) for a in amenities}
+        })
+    return rooms
 
-# Objective Function
-def cost_per_feature(s1, s2, room):
-    """
-    The dissatisfaction score for two roommates in a given room
-    Lower score = better
-    """
-    room_feats = set(room["features"])
+# Objective functions
 
-    # The number of features that match student preferred features
-    matched1 = len(set(s1["room_features"]) & room_feats)
-    matched2 = len(set(s2["room_features"]) & room_feats)
-
-    # Return the difference in each
-    return (
-        abs(s1["sleep"] - s2["sleep"]) + abs(s1["clean"] - s2["clean"]) + abs(s1["noise"] - s2["noise"]) +
-        abs(s1["roommate_preference"] - s2["roommate_preference"]) + abs(matched1 - matched2)
+def student_room_cost(student, room):
+    """Penalty for each amenity the student wants but the room doesn't have."""
+    return sum(
+        student[f"wants_{a}"] and not room[f"has_{a}"]
+        for a in amenities
     )
 
-def objective(assignment):
-    """
-    Total dissatisfaction score across all rooms.
-    """
-    # Initialize total score as zero
+def student_pair_cost(s1, s2):
+    """Lifestyle incompatibility between two roommates."""
+    return (
+        abs(s1["sleep"] - s2["sleep"]) +
+        abs(s1["clean"] - s2["clean"]) +
+        abs(s1["noise"] - s2["noise"]) +
+        abs(s1["roommate_count"] - s2["roommate_count"])
+    )
+
+def objective(assignment, room_map, student_map):
     total = 0
-    # Iterate through room and student ids
     for room_id, student_ids in assignment.items():
         room = room_map[room_id]
         occupants = [student_map[sid] for sid in student_ids]
-        # Add the total cost of dissatisfaction for students and rooms
+        # Pairwise lifestyle compatibility
         for s1, s2 in combinations(occupants, 2):
-            total += cost_per_feature(s1, s2, room)
+            total += student_pair_cost(s1, s2)
+        # Each student's unmet room preferences
+        for s in occupants:
+            total += student_room_cost(s, room)
     return total
 
-# Hill Climbing
+# First choice Hill Climbing
+
 def initial_assignment(students, rooms):
-    """
-    Randomly assigns students to rooms
-    """
-    # Shuffle students to make a random assignment
     shuffle = random.sample([s["id"] for s in students], len(students))
-    # Create empty dictionary to keep assignment with room id
     assignment = {r["room_id"]: [] for r in rooms}
-    # Start at 0
     idx = 0
-    # For each room in the list
     for room in rooms:
-        # Number of students to place in each room
-        # Capacity or students left (whichever is smaller)
-        num_students = min(room["capacity"], len(shuffle) - idx)
-        # Slices list add the students to rooms
-        assignment[room["room_id"]] = shuffle[idx : idx + num_students]
-        # Index is whatever the number of students place and breaks when complete
-        idx += num_students
+        n = min(room["capacity"], len(shuffle) - idx)
+        assignment[room["room_id"]] = shuffle[idx: idx + n]
+        idx += n
         if idx >= len(shuffle):
             break
     return assignment
 
 def get_neighbors(assignment):
-    """
-    Get all neighbors by swapping students
-    """
-    # Working on this still
-    return
+    """Generate all neighbors by swapping one student between every pair of rooms."""
+    neighbors = []
+    room_ids = list(assignment.keys())
+    for r1, r2 in combinations(room_ids, 2):
+        for i, s1 in enumerate(assignment[r1]):
+            for j, s2 in enumerate(assignment[r2]):
+                neighbor = {rid: list(sids) for rid, sids in assignment.items()}
+                neighbor[r1][i] = s2
+                neighbor[r2][j] = s1
+                neighbors.append(neighbor)
+    return neighbors
 
-def hill_climbing(students, rooms, max_iterations=1000):
+def first_choice_hill_climbing(students, rooms, student_map, room_map, max_iterations=1000):
     current = initial_assignment(students, rooms)
-    current_cost = objective(current)
+    current_cost = objective(current, room_map, student_map)
 
     for _ in range(max_iterations):
         neighbors = get_neighbors(current)
         if not neighbors:
             break
 
-        # First Choice:
-        # Shuffle neighbors and take the first improvement
         random.shuffle(neighbors)
-        # There is no improvement yet, so false
         improvement = False
-        # Iterate through neighbors
         for neighbor in neighbors:
-            # Cost of neighbor
-            neighbor_cost = objective(neighbor)
-            # Determine if neighbor cost is less than the current
+            neighbor_cost = objective(neighbor, room_map, student_map)
             if neighbor_cost < current_cost:
-                # If so current is the neighbor
                 current = neighbor
                 current_cost = neighbor_cost
                 improvement = True
                 break
 
-        # If no improvement then there could be a local min
         if not improvement:
-            break  # no improvement found
-    # Return current and current cost
+            break
+
     return current, current_cost
 
 # Run
 if __name__ == "__main__":
-    assignment, cost = hill_climbing(students, rooms, max_iterations=1000)
-    print(f"Total Dissatisfaction Score: {cost}")
+    students = load_students("data/students.csv")
+    rooms = load_rooms("data/rooms.csv")
+    student_map = {s["id"]: s for s in students}
+    room_map = {r["room_id"]: r for r in rooms}
+
+    assignment, cost = first_choice_hill_climbing(students, rooms, student_map, room_map)
+
+    print(f"Total Dissatisfaction Score: {cost}\n")
     for room_id, student_ids in assignment.items():
-        print(f"  Room {room_id}: Students {student_ids}")
+        names = [student_map[sid]["name"] for sid in student_ids]
+        print(f"{room_map[room_id]['name']}: {', '.join(names)}")
