@@ -24,7 +24,9 @@ Cs4100-AI-Roomaite/
 │   └── rooms.csv
 ├── First-Choice-Hill-Climbing/
 │   ├── first_choice_hill_climbing.py
-└── output.txt
+├── results/
+│   ├── output.txt
+    └── first_choice_hill_climbing.png
 ```
 
 ---
@@ -37,7 +39,7 @@ pip install tqdm
 python algorithms/first_choice_hill_climbing.py
 ```
 
-Results are saved to `output.txt`.
+Results are saved to `output.txt` and figure is saved to `first_choice_hill_climbing.png`.
 
 ---
 
