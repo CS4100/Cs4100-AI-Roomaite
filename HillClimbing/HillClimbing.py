@@ -1,5 +1,6 @@
 import csv
 import random
+import time
 from pathlib import Path
 import matplotlib.pyplot as plt
 from multiprocessing import Pool, cpu_count
@@ -200,6 +201,7 @@ def steepest_ascent_hill_climbing(students, rooms, n_workers=None):
     with Pool(processes=n_workers) as pool:
         try:
             while True:
+                iter_start = time.time()
                 print(f"[Iter {iteration}] Score: {current_value} | Dispatching {len(chunks)} chunks to {n_workers} workers...")
 
                 worker_args = [
@@ -227,8 +229,10 @@ def steepest_ascent_hill_climbing(students, rooms, n_workers=None):
                 state[r2].append(s1)
                 current_value += delta
                 scores.append(current_value)
+                iter_time = time.time() - iter_start
                 print(f"[Iter {iteration}] ✓ Swapped student {s_ids[s1]} (room {r_ids[r1]}) ↔ "
-                      f"student {s_ids[s2]} (room {r_ids[r2]}) | Δ={delta:+} | New score: {current_value}\n")
+                      f"student {s_ids[s2]} (room {r_ids[r2]}) | Δ={delta:+} | New score: {current_value} | "
+                      f"Time: {iter_time:.2f}s\n")
                 iteration += 1
 
         except KeyboardInterrupt:
