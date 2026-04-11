@@ -1,219 +1,379 @@
-from __future__ import annotations
+"""
+algo.py - Stochastic Hill Climbing for roommate matching
+CS4100 AI Project
 
-import itertools
+Objective function:
+score =
+    sum of pairwise roommate incompatibility
+    + sum of roommate-count mismatch penalties
+    + sum of room-feature mismatch penalties
+"""
+
 import random
-from dataclasses import dataclass
-from typing import Dict, List, Sequence, Tuple
+import time
+import os
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 
-@dataclass(frozen=True)
-class Student:
-    student_id: int
-    name: str
-    sleep: int
-    clean: int
-    noise: int
-    roommate: int
-    features: frozenset[str]
-    preferred_roommates: frozenset[int] = frozenset()
+PREF_COLS = ["sleep", "clean", "noise"]
+ROOMMATE_COUNT_COL = "roommate_count"
+
+FEATURE_NAMES = [
+    "ac",
+    "private_bath",
+    "balcony",
+    "kitchen",
+    "laundry",
+    "wifi",
+    "parking",
+]
+
+STUDENT_FEATURE_COLS = [f"wants_{f}" for f in FEATURE_NAMES]
+ROOM_FEATURE_COLS = [f"has_{f}" for f in FEATURE_NAMES]
 
 
-def make_student(
-    student_id: int,
-    name: str,
-    sleep: int,
-    clean: int,
-    noise: int,
-    roommate: int,
-    features: Sequence[str],
-    preferred_roommates: Sequence[int] | None = None,
-) -> Student:
-    return Student(
-        student_id=student_id,
-        name=name,
-        sleep=sleep,
-        clean=clean,
-        noise=noise,
-        roommate=roommate,
-        features=frozenset(features),
-        preferred_roommates=frozenset(preferred_roommates or []),
+# Load data
+def load_data(students_path, rooms_path):
+    """
+    Load student and room CSV files and return the dataframes
+    plus numpy arrays for fast scoring.
+    """
+    students_df = pd.read_csv(students_path)
+    rooms_df = pd.read_csv(rooms_path)
+
+    student_prefs = students_df[PREF_COLS].values.astype(int)
+    student_roommate_counts = students_df[ROOMMATE_COUNT_COL].values.astype(int)
+    student_features = students_df[STUDENT_FEATURE_COLS].values.astype(int)
+
+    room_features = rooms_df[ROOM_FEATURE_COLS].values.astype(int)
+    room_capacities = rooms_df["capacity"].values.astype(int)
+
+    return (
+        students_df,
+        rooms_df,
+        student_prefs,
+        student_roommate_counts,
+        student_features,
+        room_features,
+        room_capacities,
     )
 
 
-DEFAULT_WEIGHTS: Dict[str, int] = {
-    "sleep": 1,
-    "clean": 1,
-    "noise": 1,
-    "roommate": 1,
-    "feature": 1,
-    "preferred_roommate_bonus": 2,
-}
+def student_pair_cost(student_prefs, i, j):
+    """
+    Pairwise incompatibility between two students:
+    sum of absolute differences in sleep, clean, and noise.
+    """
+    return int(np.sum(np.abs(student_prefs[i] - student_prefs[j])))
 
 
-def pair_cost(s1: Student, s2: Student, weights: Dict[str, int] | None = None) -> int:
-    w = DEFAULT_WEIGHTS.copy()
-    if weights:
-        w.update(weights)
+def roommate_count_penalty(student_roommate_counts, student_idx, room_size):
+    """
+    Penalty for mismatch between preferred roommate count
+    and actual roommate count.
 
-    shared_features = len(s1.features & s2.features)
-    max_feature_count = max(len(s1.features), len(s2.features), 1)
-    feature_penalty = max_feature_count - shared_features
-
-    cost = (
-        w["sleep"] * abs(s1.sleep - s2.sleep)
-        + w["clean"] * abs(s1.clean - s2.clean)
-        + w["noise"] * abs(s1.noise - s2.noise)
-        + w["roommate"] * abs(s1.roommate - s2.roommate)
-        + w["feature"] * feature_penalty
-    )
-
-    if s2.student_id in s1.preferred_roommates or s1.student_id in s2.preferred_roommates:
-        cost -= w["preferred_roommate_bonus"]
-
-    return cost
+    actual roommate count = room size - 1
+    """
+    actual_roommates = room_size - 1
+    preferred_roommates = int(student_roommate_counts[student_idx])
+    return abs(preferred_roommates - actual_roommates)
 
 
-def room_cost(room: Sequence[Student], weights: Dict[str, int] | None = None) -> int:
+def room_match_cost(student_features, room_features, student_idx, room_idx):
+    """
+    Add 1 for each wanted feature that the room does not have.
+    """
+    wants = student_features[student_idx]
+    has = room_features[room_idx]
+    return int(np.sum(wants * (1 - has)))
+
+
+def room_cost(
+    room_idx,
+    student_indices,
+    student_prefs,
+    student_roommate_counts,
+    student_features,
+    room_features,
+):
+    """
+    Cost for one room:
+    1. pairwise incompatibility
+    2. roommate-count mismatch penalty
+    3. room-feature mismatch penalty
+    """
     total = 0
-    for a, b in itertools.combinations(room, 2):
-        total += pair_cost(a, b, weights)
+    room_size = len(student_indices)
+
+    for i in range(room_size):
+        for j in range(i + 1, room_size):
+            total += student_pair_cost(
+                student_prefs,
+                student_indices[i],
+                student_indices[j],
+            )
+
+        total += roommate_count_penalty(
+            student_roommate_counts,
+            student_indices[i],
+            room_size,
+        )
+
+        total += room_match_cost(
+            student_features,
+            room_features,
+            student_indices[i],
+            room_idx,
+        )
+
     return total
 
 
-def total_cost(rooms: Sequence[Sequence[Student]], weights: Dict[str, int] | None = None) -> int:
-    return sum(room_cost(room, weights) for room in rooms)
-
-
-def random_assignment(students: Sequence[Student], room_capacities: Sequence[int]) -> List[List[Student]]:
-    if sum(room_capacities) != len(students):
-        raise ValueError("Total room capacity must equal number of students.")
-
-    shuffled = list(students)
-    random.shuffle(shuffled)
-
-    rooms: List[List[Student]] = []
-    start = 0
-    for capacity in room_capacities:
-        rooms.append(shuffled[start:start + capacity])
-        start += capacity
-
-    return rooms
-
-
-def random_neighbor(rooms: Sequence[Sequence[Student]]) -> List[List[Student]]:
+def assignment_cost(
+    assignment,
+    student_prefs,
+    student_roommate_counts,
+    student_features,
+    room_features,
+):
     """
-    Generate exactly ONE random neighbor:
-    choose two random rooms, then swap one random student from each.
+    Total cost of an assignment.
+    assignment = {room_idx: [student_idx, ...]}
     """
-    new_rooms = [list(room) for room in rooms]
+    total = 0
 
-    if len(new_rooms) < 2:
-        return new_rooms
+    for room_idx, student_indices in assignment.items():
+        total += room_cost(
+            room_idx,
+            student_indices,
+            student_prefs,
+            student_roommate_counts,
+            student_features,
+            room_features,
+        )
 
-    r1, r2 = random.sample(range(len(new_rooms)), 2)
+    return total
 
-    if not new_rooms[r1] or not new_rooms[r2]:
-        return new_rooms
+# Stochastic Hill Climbing algorithm
+def make_initial_assignment(n_students, room_capacities):
+    """
+    Randomly assign students to rooms.
 
-    i = random.randrange(len(new_rooms[r1]))
-    j = random.randrange(len(new_rooms[r2]))
+    Randomly shuffles room indices, picks rooms until total capacity
+    is enough for all students, then fills them with shuffled students.
+    """
+    indices = list(range(len(room_capacities)))
+    random.shuffle(indices)
 
-    new_rooms[r1][i], new_rooms[r2][j] = new_rooms[r2][j], new_rooms[r1][i]
-    return new_rooms
+    selected_rooms = []
+    total_cap = 0
+    for idx in indices:
+        selected_rooms.append(idx)
+        total_cap += room_capacities[idx]
+        if total_cap >= n_students:
+            break
+
+    students = list(range(n_students))
+    random.shuffle(students)
+
+    assignment = {}
+    pos = 0
+
+    for room_idx in selected_rooms:
+        cap = room_capacities[room_idx]
+        end = min(pos + cap, n_students)
+
+        if pos < end:
+            assignment[room_idx] = students[pos:end]
+            pos = end
+
+        if pos >= n_students:
+            break
+
+    return assignment
 
 
 def stochastic_hill_climbing(
-    students: Sequence[Student],
-    room_capacities: Sequence[int],
-    max_steps: int = 50000,
-    restarts: int = 1,
-    weights: Dict[str, int] | None = None,
-    seed: int | None = 42,
-) -> Tuple[List[List[Student]], int, List[int]]:
+    student_prefs,
+    student_roommate_counts,
+    student_features,
+    room_features,
+    room_capacities,
+    max_iter=5000,
+):
     """
     Stochastic hill climbing:
-    - start with a random assignment
-    - each iteration generates ONE random neighbor
-    - move only if the neighbor is better
-    - keep best-so-far history for plotting
+    - start from a random valid assignment
+    - each iteration generates one random neighbor
+    - neighbor = swap one random student between two random rooms
+    - accept only if the score improves
     """
-    if seed is not None:
-        random.seed(seed)
+    n_students = len(student_prefs)
 
-    best_overall_rooms: List[List[Student]] | None = None
-    best_overall_cost = float("inf")
-    history: List[int] = []
+    current = make_initial_assignment(n_students, room_capacities)
+    current_cost = assignment_cost(
+        current,
+        student_prefs,
+        student_roommate_counts,
+        student_features,
+        room_features,
+    )
 
-    for _ in range(restarts):
-        current_rooms = random_assignment(students, room_capacities)
-        current_cost = total_cost(current_rooms, weights)
+    best = {k: v[:] for k, v in current.items()}
+    best_cost = current_cost
+    history = [current_cost]
 
-        if current_cost < best_overall_cost:
-            best_overall_rooms = [list(room) for room in current_rooms]
-            best_overall_cost = current_cost
+    start_time = time.time()
 
-        history.append(int(best_overall_cost))
+    for _ in range(max_iter):
+        rooms = list(current.keys())
+        if len(rooms) < 2:
+            break
 
-        for _ in range(max_steps):
-            neighbor_rooms = random_neighbor(current_rooms)
-            neighbor_cost = total_cost(neighbor_rooms, weights)
+        r1, r2 = random.sample(rooms, 2)
 
-            if neighbor_cost < current_cost:
-                current_rooms = neighbor_rooms
-                current_cost = neighbor_cost
+        if len(current[r1]) == 0 or len(current[r2]) == 0:
+            history.append(best_cost)
+            continue
 
-                if current_cost < best_overall_cost:
-                    best_overall_rooms = [list(room) for room in current_rooms]
-                    best_overall_cost = current_cost
+        old_cost_r1 = room_cost(
+            r1,
+            current[r1],
+            student_prefs,
+            student_roommate_counts,
+            student_features,
+            room_features,
+        )
+        old_cost_r2 = room_cost(
+            r2,
+            current[r2],
+            student_prefs,
+            student_roommate_counts,
+            student_features,
+            room_features,
+        )
 
-            history.append(int(best_overall_cost))
+        i = random.randint(0, len(current[r1]) - 1)
+        j = random.randint(0, len(current[r2]) - 1)
 
-    if best_overall_rooms is None:
-        raise RuntimeError("No assignment produced.")
+        new_r1 = current[r1][:]
+        new_r2 = current[r2][:]
 
-    return best_overall_rooms, int(best_overall_cost), history
+        new_r1[i], new_r2[j] = new_r2[j], new_r1[i]
 
+        new_cost_r1 = room_cost(
+            r1,
+            new_r1,
+            student_prefs,
+            student_roommate_counts,
+            student_features,
+            room_features,
+        )
+        new_cost_r2 = room_cost(
+            r2,
+            new_r2,
+            student_prefs,
+            student_roommate_counts,
+            student_features,
+            room_features,
+        )
 
-def explain_assignment(rooms: Sequence[Sequence[Student]], weights: Dict[str, int] | None = None) -> str:
-    lines: List[str] = []
-    lines.append(f"Total objective cost: {total_cost(rooms, weights)}")
+        delta = (new_cost_r1 + new_cost_r2) - (old_cost_r1 + old_cost_r2)
 
-    for idx, room in enumerate(rooms, start=1):
-        names = ", ".join(student.name for student in room)
-        lines.append(f"Room {idx} ({len(room)} students): {names} | room cost = {room_cost(room, weights)}")
+        # only accept better moves
+        if delta < 0:
+            current[r1] = new_r1
+            current[r2] = new_r2
+            current_cost += delta
 
-    return "\n".join(lines)
+            if current_cost < best_cost:
+                best = {k: v[:] for k, v in current.items()}
+                best_cost = current_cost
 
+        history.append(best_cost)
 
-def print_rooms(rooms: Sequence[Sequence[Student]], weights: Dict[str, int] | None = None) -> None:
-    print(explain_assignment(rooms, weights))
-
-
-def demo_students() -> List[Student]:
-    return [
-        make_student(1, "Alice", 1, 5, 1, 1, ["quiet", "study", "ac"], [2]),
-        make_student(2, "Ben", 1, 4, 1, 1, ["quiet", "study", "ac"], [1]),
-        make_student(3, "Cara", 5, 2, 5, 2, ["social", "late-night", "warm"], [4]),
-        make_student(4, "David", 4, 2, 4, 2, ["social", "late-night", "warm"], [3]),
-        make_student(5, "Eva", 2, 5, 2, 1, ["quiet", "clean", "window"]),
-        make_student(6, "Finn", 2, 4, 2, 1, ["quiet", "clean", "window"]),
-        make_student(7, "Gina", 4, 1, 5, 3, ["social", "music", "warm"]),
-        make_student(8, "Hugo", 4, 2, 4, 3, ["social", "music", "warm"]),
-    ]
+    elapsed = time.time() - start_time
+    return best, best_cost, history, elapsed
 
 
 if __name__ == "__main__":
-    students = demo_students()
-    room_capacities = [2, 2, 2, 2]
+    random.seed(42)
 
-    rooms, cost, history = stochastic_hill_climbing(
-        students=students,
-        room_capacities=room_capacities,
-        max_steps=1000,
-        restarts=3,
-        seed=42,
+    base_dir = Path(__file__).resolve().parent
+    students_path = base_dir.parent / "data" / "students.csv"
+    rooms_path = base_dir.parent / "data" / "rooms.csv"
+
+    (
+        students_df,
+        rooms_df,
+        student_prefs,
+        student_roommate_counts,
+        student_features,
+        room_features,
+        room_capacities,
+    ) = load_data(students_path, rooms_path)
+
+    print(
+        f"running stochastic hill climbing on "
+        f"{len(students_df)} students, {len(rooms_df)} rooms...\n"
     )
 
-    print(f"Best cost found: {cost}\n")
-    print_rooms(rooms)
-    print(f"\nHistory points: {len(history)}")
+    best_assignment, best_cost, history, elapsed = stochastic_hill_climbing(
+        student_prefs,
+        student_roommate_counts,
+        student_features,
+        room_features,
+        room_capacities,
+        max_iter=5000,
+    )
+
+    starting_cost = history[0]
+    improvement = (
+        (starting_cost - best_cost) / starting_cost * 100
+        if starting_cost != 0 else 0.0
+    )
+
+    print(f"starting cost:  {starting_cost}")
+    print(f"final cost:     {best_cost}")
+    print(f"improvement:    {improvement:.1f}%")
+    print(f"iterations:     {len(history)}")
+    print(f"runtime:        {elapsed:.2f} seconds")
+    print(f"rooms used:     {len(best_assignment)}\n")
+
+# Print first 10 sample room assignments
+    print("sample room assignments (first 10):")
+    for room_idx, student_indices in list(best_assignment.items())[:10]:
+        room_name = rooms_df.iloc[room_idx]["room_name"]
+        cap = room_capacities[room_idx]
+        student_names = [students_df.iloc[s]["name"] for s in student_indices]
+        rc = room_cost(
+            room_idx,
+            student_indices,
+            student_prefs,
+            student_roommate_counts,
+            student_features,
+            room_features,
+        )
+        print(
+            f"  {room_name} (cap {cap}): "
+            f"{', '.join(student_names)} | cost: {rc}"
+        )
+
+    os.makedirs("results", exist_ok=True)
+
+# Plot
+    plt.figure(figsize=(10, 5))
+    plt.plot(history, linewidth=0.8)
+    plt.xlabel("iteration")
+    plt.ylabel("total cost")
+    plt.title(
+        f"stochastic hill climbing - {len(students_df)} students, "
+        f"{len(best_assignment)} rooms ({elapsed:.1f}s)"
+    )
+    plt.tight_layout()
+    plt.savefig("results/shc_cost_history.png", dpi=150)
+    print("\nplot saved to results/shc_cost_history.png")
