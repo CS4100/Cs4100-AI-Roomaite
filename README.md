@@ -35,56 +35,79 @@ This makes the algorithm a hill climbing method, because it only moves to better
 ## Objective Function
 The total cost is based on pairwise incompatibility between students in the same room.
 
-For each pair of students, the cost includes:
+score = pairwise incompatibility + roommate-count mismatch penalty + room-feature mismatch penalty
 
-- difference in sleep preference
-- difference in cleanliness preference
-- difference in noise preference
-- difference in preferred roommate count
-- mismatch in room feature preferences
+Lower score means a better roommate assignment.
 
-There is also a bonus reduction if two students are preferred roommates.
+1. Pairwise incompatibility
 
-The overall room assignment cost is:
+- absolute difference in sleep preference
+- absolute difference in cleanliness preference
+- absolute difference in noise tolerance
 
-- sum of pair costs within each room
-- summed across all rooms
+2. Roommate-count mismatch penalty
 
-Lower total cost means a better roommate assignment.
+For each student, the algorithm adds: |preferred roommate count - actual roommate count|where: actual roommate count = room size - 1
+
+3. Room-feature mismatch penalty
+For each student, the algorithm adds: +1 for each preferred room feature that the assigned room does not have
 
 
 ## Files
 ### `algo.py`
-Contains:
-- the `Student` data structure
-- cost functions
-- random initial assignment
-- random neighbor generation
-- stochastic hill climbing algorithm
-- helper functions for printing assignments
+This file contains the full stochastic hill climbing implementation, including:
+- data loading
+- objective function
+- initial random assignment
+- stochastic hill climbing search
+- result printing
+- plotting
 
-### `run_data.py`
-Loads data from:
-- `data/students.csv`
-- `data/rooms.csv`
-
-Then it:
-- converts CSV rows into `Student` objects
-- runs stochastic hill climbing
-- records cost history
-- plots cost over iterations
-- saves the figure to the `results/` folder
+### `generate_data.py`
+This file generates the synthetic datasets used in the project:
+- data/students.csv
+- data/rooms.csv
 
 ### `data/students.csv`
-Student preference dataset.
+Contains student preference data, including:
+- student_id
+- name
+- sleep
+- clean
+- noise
+- roommate_count
+- preferred room features such as wants_ac, wants_wifi, etc.
 
 ### `data/rooms.csv`
-Room capacity dataset.
+Contains room data, including:
+- room_id
+- room_name
+- capacity
+- available room features such as has_ac, has_wifi, etc.
 
+### `results/shc_cost_history.png`
+Saved plot showing how the best-so-far cost changes over iterations.
 
 ## How to Run
+1. If the CSV files already exist:
+python3 algo.py
 
-From inside the `StochasticHillClimbing` folder:
+2. If need to regenerate the datasets first:
+python3 generate_data.py
+python3 algo.py
 
-```bash
-python3 run_data.py
+## Output
+### The program prints:
+- starting cost
+- final cost
+- percentage improvement
+- number of iterations
+- runtime
+- number of rooms used
+- sample room assignments for the first 10 rooms
+
+### Each sample assignment includes:
+- real room name
+- room capacity
+- assigned student names
+- room cost
