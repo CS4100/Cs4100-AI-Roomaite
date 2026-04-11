@@ -195,6 +195,36 @@ def calculate_value(state, students, rooms):
             score += len(wanted - has)
     return score
 
+def sample_room_assignments(assignment, students, rooms, n=4):
+    """
+    Display sample room assignments
+    """
+    results = []
+    for room_id, occupants in assignment.items():
+        if not occupants:
+            continue
+        cost = 0
+        # preference mismatch
+        for i in range(len(occupants)):
+            for j in range(i + 1, len(occupants)):
+                s1, s2 = students[occupants[i]], students[occupants[j]]
+                cost += abs(s1["sleep"]-s2["sleep"]) + abs(s1["clean"]-s2["clean"]) + abs(s1["noise"]-s2["noise"])
+        # roommate count penalty
+        actual = len(occupants) - 1
+        for sid in occupants:
+            cost += abs(students[sid]["roommate_preference"] - actual)
+        # feature mismatch
+        for sid in occupants:
+            wanted = {f[6:] for f in students[sid]["room_features"] if f.startswith("wants_")}
+            has = {f[4:] for f in rooms[room_id]["features"] if f.startswith("has_")}
+            cost += len(wanted - has)
+        results.append((room_id, occupants, cost))
+
+    results = [r for r in results if len(r[1]) > 1]
+    results.sort(key=lambda x: x[2])
+    for room_id, occupants, cost in results[:n]:
+        names = ", ".join(f"Student_{sid}" for sid in occupants)
+        print(f"Room_{room_id} | {len(occupants)} | {names} | {cost}")
 
 def plot_history(history, n_students, n_rooms, elapsed, output_path):
     """

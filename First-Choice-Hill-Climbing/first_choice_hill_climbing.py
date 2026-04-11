@@ -15,10 +15,11 @@ from utils import (
     calculate_value,
     plot_history,
     save_results,
+    sample_room_assignments,
 )
 
 
-def first_choice_hill_climbing(students, rooms, show_progress=True, max_iterations=1000):
+def first_choice_hill_climbing(students, rooms, show_progress=True, max_iterations=5000):
     """
     Run first-choice hill climbing to find a low-cost room assignment
 
@@ -168,13 +169,16 @@ def main():
     students = load_students_csv(data_dir / "students.csv")
     rooms = load_rooms_csv(data_dir / "rooms.csv")
     # Successful load
-    print(f"Loaded {len(students)} students and {len(rooms)} rooms.")
+    print(f"Loaded {len(students)} students and {len(rooms)} rooms")
 
     # Run algorithm and time!
     start = time.time()
     assignment, history = first_choice_hill_climbing(
-        students, rooms, show_progress=True, max_iterations=1000)
+        students, rooms, show_progress=True, max_iterations=5000)
     elapsed = time.time() - start
+
+    # Sample room assignments
+    sample_room_assignments(assignment, students, rooms)
 
     # Report score and save results
     best_score = calculate_value(assignment, students, rooms)
