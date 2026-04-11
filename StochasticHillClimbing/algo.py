@@ -203,7 +203,7 @@ def stochastic_hill_climbing(
     student_features,
     room_features,
     room_capacities,
-    max_iter=5000,
+    max_iter=50000,
 ):
     """
     Stochastic hill climbing:
@@ -328,7 +328,7 @@ if __name__ == "__main__":
         student_features,
         room_features,
         room_capacities,
-        max_iter=5000,
+        max_iter=50000,
     )
 
     starting_cost = history[0]
