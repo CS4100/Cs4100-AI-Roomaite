@@ -1,4 +1,4 @@
-# DormMatch AI — CS4100
+# RoomAIte — CS4100
 
 Local search algorithms for optimizing student dorm room assignments.
 
