@@ -23,6 +23,7 @@ Cs4100-AI-Roomaite/
 │   ├── students.csv
 │   └── rooms.csv
 ├── First-Choice-Hill-Climbing/
+|   ├── utils.py
 │   ├── first_choice_hill_climbing.py
 ├── results/
 │   ├── output.txt
@@ -34,9 +35,7 @@ Cs4100-AI-Roomaite/
 ## How to Run
 
 ```bash
-pip install tqdm
-
-python algorithms/first_choice_hill_climbing.py
+python First-Choice-Hill-Climbing/first_choice_hill_climbing.py
 ```
 
 Results are saved to `output.txt` and figure is saved to `first_choice_hill_climbing.png`.
@@ -51,8 +50,6 @@ Results are saved to `output.txt` and figure is saved to `first_choice_hill_clim
 
 ---
 
-## Team
-
-| Name | Algorithm |
+| Author | Algorithm |
 |---|---|
 | Isabella Uhniat | First Choice Hill Climbing |
