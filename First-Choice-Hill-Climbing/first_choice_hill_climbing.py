@@ -2,7 +2,6 @@
 filename: first_choice_hill_climbing.py
 First choice hill climbing algorithm for roommate assignment system
 """
-
 import random
 import time
 from pathlib import Path
@@ -17,7 +16,12 @@ from utils import (
     save_results,
     sample_room_assignments,
 )
-
+"""
+I utilized AI to help me understand the complete process of first choice. When it came to swapping 
+I was a little confused and used AI to help with debugging. At first the process was very slow as well
+and I used AI to help with the delta function to minimize cost. AI was used to debug and assist with the 
+process of the algorithm!
+"""
 
 def first_choice_hill_climbing(students, rooms, show_progress=True, max_iterations=5000):
     """

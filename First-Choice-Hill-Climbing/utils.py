@@ -38,7 +38,6 @@ def load_students_csv(file_path):
             }
     return students
 
-
 def load_rooms_csv(file_path):
     """
     Load rooms data from a CSV file into a dictionary.
@@ -142,7 +141,6 @@ def random_assignment_arrays(n_s, cap, show_progress=True):
                 placed = True
     return state
 
-
 def calculate_value_arrays(state, rpref, compat, feature_cost):
     """
     Compute the total objective cost of a given assignment using the pre-built arrays.
@@ -163,7 +161,6 @@ def calculate_value_arrays(state, rpref, compat, feature_cost):
         for si in occ:
             score += feature_cost[si][ri]
     return score
-
 
 def calculate_value(state, students, rooms):
     """
@@ -191,13 +188,15 @@ def calculate_value(state, students, rooms):
         for sid in occupants:
             s = students[sid]
             wanted = {f[len("wants_"):] for f in s["room_features"] if f.startswith("wants_")}
-            has    = {f[len("has_"):] for f in rooms[room]["features"] if f.startswith("has_")}
+            has = {f[len("has_"):] for f in rooms[room]["features"] if f.startswith("has_")}
             score += len(wanted - has)
     return score
 
 def sample_room_assignments(assignment, students, rooms, n=4):
     """
     Display sample room assignments
+    I used AI here to assist me in printing out the sample room assignment. I needed help with the process of this
+    to ensure I printed it out correctly!
     """
     results = []
     for room_id, occupants in assignment.items():
