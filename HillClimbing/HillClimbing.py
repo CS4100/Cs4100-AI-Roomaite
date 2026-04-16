@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from multiprocessing import Pool, cpu_count
 import os
 
+# I used AI to help write some of the code. Specifically the plots, the output file logic, tqdm, and the parallel processing. 
+
 try:
     from tqdm import tqdm
     TQDM_AVAILABLE = True
